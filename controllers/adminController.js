@@ -1,138 +1,201 @@
 const Admin = require("../models/Admin");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
-const { validationResult } = require("express-validator");
-require("dotenv").config();
-const { JWT_SECRET } = process.env;
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
-// Controller to get all admins (admin only)
+// Function to get all admins (admin only)
 exports.getAdmins = async (req, res) => {
   try {
     const admins = await Admin.find();
     res.json(admins);
-  } catch (error) {
-    console.error("Error fetching admins:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
   }
 };
 
-// Controller to get a single admin profile
+// Function to get the profile of the authenticated admin
 exports.getAdmin = async (req, res) => {
   try {
-    const admin = await Admin.findById(req.user._id);
-    if (!admin) return res.status(404).json({ error: "Admin not found" });
+    const admin = await Admin.findById(req.admin.id).select("-password");
     res.json(admin);
-  } catch (error) {
-    console.error("Error fetching admin:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
   }
 };
 
-// Controller to register a new admin
+// Function to register a new admin
 exports.registerAdmin = async (req, res) => {
+  const { first_name, last_name, email, password, phone_number } = req.body;
+
   try {
-    const { firstName, lastName, email, password, phoneNumber } = req.body;
-    const existingAdmin = await Admin.findOne({ email });
-    if (existingAdmin) return res.status(400).json({ error: "Admin already exists" });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newAdmin = new Admin({
-      firstName,
-      lastName,
-      email,
-      password: hashedPassword,
-      phoneNumber,
-    });
-
-    await newAdmin.save();
-    res.json({ message: "Admin registered successfully" });
-  } catch (error) {
-    console.error("Error registering admin:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller for admin login
-exports.loginAdmin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const admin = await Admin.findOne({ email });
-    if (!admin) return res.status(400).json({ error: "Invalid email or password" });
-
-    const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) return res.status(400).json({ error: "Invalid email or password" });
-
-    const token = jwt.sign({ user_id: admin._id, role: admin.role }, JWT_SECRET, { expiresIn: "1h" });
-    res.json({ token });
-  } catch (error) {
-    console.error("Error logging in:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller to edit admin profile
-exports.editAdminProfile = async (req, res) => {
-  try {
-    const updates = req.body;
-    const admin = await Admin.findByIdAndUpdate(req.user._id, updates, { new: true });
-    if (!admin) return res.status(404).json({ error: "Admin not found" });
-    res.json({ message: "Profile updated successfully", admin });
-  } catch (error) {
-    console.error("Error updating profile:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller for forgot password
-exports.forgotPasswordAdmin = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const admin = await Admin.findOne({ email });
-    if (!admin) return res.status(400).json({ error: "Admin not found" });
-
-    const token = jwt.sign({ user_id: admin._id }, JWT_SECRET, { expiresIn: "1h" });
-    admin.resetPasswordToken = token;
-    admin.resetPasswordExpires = Date.now() + 3600000; // 1 hour
-    await admin.save();
-
-    // Send email with the token
-    // await transporter.sendMail({
-    //   to: admin.email,
-    //   from: "no-reply@example.com",
-    //   subject: "Password Reset",
-    //   html: `<p>You requested for a password reset</p>
-    //          <p>Click this <a href="http://localhost:3000/reset/${token}">link</a> to reset password</p>`
-    // });
-
-    res.json({ message: "Password reset token sent to email" });
-  } catch (error) {
-    console.error("Error in forgot password:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller to reset admin password
-exports.resetPasswordAdmin = async (req, res) => {
-  try {
-    const { token } = req.query;
-    const { newPassword, confirmNewPassword } = req.body;
-    if (newPassword !== confirmNewPassword) {
-      return res.status(400).json({ error: "Passwords do not match" });
+    let admin = await Admin.findOne({ email });
+    if (admin) {
+      return res.status(400).json({ msg: "Admin already exists" });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const admin = await Admin.findById(decoded.user_id);
-    if (!admin || admin.resetPasswordExpires < Date.now()) return res.status(400).json({ error: "Password reset token is invalid or has expired" });
+    admin = new Admin({
+      first_name,
+      last_name,
+      email,
+      password,
+      phone_number,
+      status: "ACTIVE"
+    });
 
-    admin.password = await bcrypt.hash(newPassword, 10);
-    admin.resetPasswordToken = "";
-    admin.resetPasswordExpires = null;
+    const salt = await bcrypt.genSalt(10);
+    admin.password = await bcrypt.hash(password, salt);
+
     await admin.save();
 
-    res.json({ message: "Password updated successfully" });
-  } catch (error) {
-    console.error("Error resetting password:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+    const payload = {
+      admin: {
+        id: admin.id
+      }
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: 3600 },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token });
+      }
+    );
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Function for admin login
+exports.loginAdmin = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    let admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    const payload = {
+      admin: {
+        id: admin.id
+      }
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: 3600 },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token });
+      }
+    );
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Function to edit the profile of the authenticated admin
+exports.editAdminProfile = async (req, res) => {
+  const { first_name, last_name, phone_number, profile_picture } = req.body;
+
+  try {
+    const admin = await Admin.findByIdAndUpdate(
+      req.admin.id,
+      { first_name, last_name, phone_number, profile_picture },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    res.json(admin);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Function to handle forgot password functionality
+exports.forgotPasswordAdmin = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    let admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(400).json({ msg: "Admin not found" });
+    }
+
+    const token = crypto.randomBytes(20).toString('hex');
+
+    admin.reset_password_token = token;
+    admin.reset_password_expires = Date.now() + 3600000; // 1 hour
+    await admin.save();
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    const mailOptions = {
+      to: admin.email,
+      from: process.env.EMAIL_USER,
+      subject: 'Password Reset',
+      text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n` +
+        `Please click on the following link, or paste this into your browser to complete the process:\n\n` +
+        `http://${req.headers.host}/reset/${token}\n\n` +
+        `If you did not request this, please ignore this email and your password will remain unchanged.\n`
+    };
+
+    transporter.sendMail(mailOptions, (err, response) => {
+      if (err) {
+        console.error('There was an error: ', err);
+        return res.status(500).send("Error sending email");
+      }
+      res.status(200).json({ msg: 'Recovery email sent' });
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Function to reset the admin's password
+exports.resetPasswordAdmin = async (req, res) => {
+  const { token, password } = req.body;
+
+  try {
+    const admin = await Admin.findOne({
+      reset_password_token: token,
+      reset_password_expires: { $gt: Date.now() }
+    });
+
+    if (!admin) {
+      return res.status(400).json({ msg: "Password reset token is invalid or has expired" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    admin.password = await bcrypt.hash(password, salt);
+    admin.reset_password_token = "";
+    admin.reset_password_expires = null;
+
+    await admin.save();
+
+    res.json({ msg: "Password has been reset" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
   }
 };

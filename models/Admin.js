@@ -2,47 +2,47 @@ const { Schema, model } = require("mongoose");
 
 const adminSchema = new Schema(
   {
-    firstName: {
+    first_name: {
       type: String,
-      required: true,
+      required: true
     },
-    lastName: {
+    last_name: {
       type: String,
-      required: true,
+      required: true
     },
     email: {
       type: String,
       required: true,
-      unique: true,
+      unique: true
     },
     password: {
       type: String,
-      required: true,
+      required: true
     },
-    phoneNumber: {
+    phone_number: {
       type: String,
-      required: true,
+      required: true
     },
-    role: {
+    status: {
       type: String,
-      enum: ["admin"],
-      default: "admin",
+      enum: ['INACTIVE', 'ACTIVE', 'DELETED']
     },
-    profilePicture: {
+    profile_picture: {
       type: String,
-      default: "",
+      default: ""
     },
-    resetPasswordToken: {
+    reset_password_token: {
       type: String,
-      default: "",
+      default: ""
     },
-    resetPasswordExpires: {
+    reset_password_expires: {
       type: Date,
-      default: null,
-    },
+      default: null
+    }
   },
   {
     timestamps: true,
+    strict: false
   }
 );
 

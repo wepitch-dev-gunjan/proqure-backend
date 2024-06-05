@@ -2,55 +2,52 @@ const { Schema, model } = require("mongoose");
 
 const userSchema = new Schema(
   {
-    firstName: {
-      type: String,
-      required: true,
-    },
-    lastName: {
-      type: String,
-      required: true,
+    name: {
+      type: String
     },
     email: {
       type: String,
       required: true,
-      unique: true,
+      unique: true
+    },
+    other_email: {
+      type: String
+    },
+    phone_number: {
+      type: String,
+      required: true
     },
     password: {
       type: String,
-      required: true,
+      required: true
     },
-    phoneNumber: {
+    user_type: {
+      type: String
+    },
+    ip_address: {
+      type: String
+    },
+    status: {
       type: String,
-      required: true,
+      enum: ['ACTIVE', 'INACTIVE', 'DELETED']
     },
-    role: {
+    profile_picture: {
       type: String,
-      enum: ["user", "doctor", "admin"],
-      default: "user",
+      default: ""
     },
-    medicalHistory: {
-      type: [String],
-      default: [],
+    firm_name: {
+      type: String
     },
-    insuranceInformation: {
-      type: String,
-      default: "",
+    firm_address: {
+      type: String
     },
-    profilePicture: {
-      type: String,
-      default: "",
-    },
-    resetPasswordToken: {
-      type: String,
-      default: "",
-    },
-    resetPasswordExpires: {
-      type: Date,
-      default: null,
-    },
+    gst_number: {
+      type: String
+    }
   },
   {
     timestamps: true,
+    strict: false
   }
 );
 

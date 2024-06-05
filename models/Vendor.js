@@ -2,11 +2,11 @@ const { Schema, model } = require("mongoose");
 
 const vendorSchema = new Schema(
   {
-    firstName: {
+    first_name: {
       type: String,
       required: true
     },
-    lastName: {
+    last_name: {
       type: String,
       required: true
     },
@@ -15,87 +15,50 @@ const vendorSchema = new Schema(
       required: true,
       unique: true
     },
+    username: {
+      type: String,
+      required: true
+    },
+    company_name: {
+      type: String
+    },
+    company_location: {
+      type: String
+    },
     password: {
       type: String,
       required: true
     },
-    phoneNumber: {
+    phone_number: {
       type: String,
       required: true
     },
-    specialization: {
-      type: String,
-      required: true
-    },
-    qualifications: {
-      type: [String],
-      required: true
-    },
-    experience: {
-      type: Number, // Number of years
-      required: true
-    },
-    clinicAddress: {
-      type: String,
-      required: true
-    },
-    hospitalAffiliations: {
-      type: [String],
-      required: true
-    },
-    consultationFees: {
-      type: Number,
-      required: true
-    },
-    availableSlots: [
-      {
-        day: {
-          type: String,
-          required: true
-        },
-        startTime: {
-          type: String,
-          required: true
-        },
-        endTime: {
-          type: String,
-          required: true
-        }
-      }
-    ],
-    profilePicture: {
+    profile_picture: {
       type: String
     },
-    ratings: {
-      type: Number,
-      default: 0
+    status: {
+      type: String,
+      enum: ['ACTIVE', 'INACTIVE', 'REJECTED', 'DELETED']
     },
-    reviews: [
-      {
-        patientId: {
-          type: Schema.Types.ObjectId,
-          ref: 'User',
-          required: true
-        },
-        review: {
-          type: String,
-          required: true
-        },
-        rating: {
-          type: Number,
-          required: true
-        },
-        createdAt: {
-          type: Date,
-          default: Date.now
-        }
-      }
-    ]
+    last_activity: {
+      type: Date,
+      default: new Date()
+    },
+    gst_number: {
+      type: String,
+      required: true
+    },
+    reset_password_token: {
+      type: String,
+      default: ""
+    },
+    reset_password_expires: {
+      type: Date,
+      default: null
+    }
   },
   {
-    timestamps: true
-  },
-  {
+    timestamps: true,
     strict: false
   }
 );

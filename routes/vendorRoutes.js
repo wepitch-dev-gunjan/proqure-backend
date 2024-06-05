@@ -1,34 +1,35 @@
 const express = require("express");
 const {
-  getDoctor,
-  getDoctors,
-  registerDoctor,
-  editDoctorProfile,
-  getDoctorAppointments,
-  addAvailabilitySlot,
-  removeAvailabilitySlot,
-  getDoctorReviews,
-  respondToReview,
-  loginDoctor,
-  forgotPasswordDoctor,
-  resetPasswordDoctor
+  getVendor,
+  getVendors,
+  loginVendor,
+  registerVendor,
+  editVendorProfile,
+  forgotPasswordVendor,
+  resetPasswordVendor,
 } = require("../controllers/vendorController");
-const { adminAuth, doctorAuth } = require("../middlewares/authMiddlewares");
+const { vendorAuth } = require("../middlewares/authMiddlewares");
 const router = express.Router();
 
-router.get("/doctors", adminAuth, getDoctors);
-router.get("/doctor/profile", doctorAuth, getDoctor);
-router.get("/doctor/appointments", doctorAuth, getDoctorAppointments);
-router.get("/doctor/reviews", doctorAuth, getDoctorReviews);
+// Route to get all vendors (admin only)
+router.get("/vendors", vendorAuth, getVendors);
 
-router.post("/doctor/register", registerDoctor);
-router.post("/doctor/login", loginDoctor);
-router.post("/doctor/forgotPassword", forgotPasswordDoctor);
-router.post("/doctor/resetPassword", resetPasswordDoctor);
+// Route to get the profile of the authenticated vendor
+router.get("/vendor/profile", vendorAuth, getVendor);
 
-router.put("/doctor/profile", doctorAuth, editDoctorProfile);
-router.put("/doctor/availability", doctorAuth, addAvailabilitySlot);
-router.delete("/doctor/availability", doctorAuth, removeAvailabilitySlot);
-router.put("/doctor/review/respond", doctorAuth, respondToReview);
+// Route to register a new vendor
+router.post("/vendor/register", registerVendor);
+
+// Route for vendor login
+router.post("/vendor/login", loginVendor);
+
+// Route to handle forgot password functionality
+router.post("/vendor/forgotPassword", forgotPasswordVendor);
+
+// Route to reset the vendor's password
+router.post("/vendor/resetPassword", resetPasswordVendor);
+
+// Route to edit the profile of the authenticated vendor
+router.put("/vendor/profile", vendorAuth, editVendorProfile);
 
 module.exports = router;

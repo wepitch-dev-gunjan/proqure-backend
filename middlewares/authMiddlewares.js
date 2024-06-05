@@ -1,55 +1,157 @@
 const jwt = require("jsonwebtoken");
-const Doctor = require("../models/Vendor");
-require("dotenv").config();
-const { JWT_SECRET } = process.env;
 
-// Middleware to authenticate doctor
-exports.doctorAuth = async (req, res, next) => {
+// Middleware to verify admin authentication
+exports.adminAuth = (req, res, next) => {
+  // Get token from Authorization header
+  const token = req.header("Authorization")?.split(' ')[1];
+
+  // Check if not token
+  if (!token) {
+    return res.status(401).json({ msg: "No token, authorization denied" });
+  }
+
+  // Verify token
   try {
-    const token = req.header("Authorization").replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Access denied. No token provided." });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded.user; // Assuming the token payload contains the user object
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const doctor = await Doctor.findById(decoded.doctor_id);
-    if (!doctor) return res.status(401).json({ error: "Access denied. Invalid token." });
+    // Check if the user is an admin
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ msg: "Permission denied" });
+    }
 
-    req.doctor = doctor;
     next();
-  } catch (error) {
-    console.error("Authentication error:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+  } catch (err) {
+    res.status(401).json({ msg: "Token is not valid" });
   }
 };
 
-exports.userAuth = async (req, res, next) => {
+// Middleware to verify user authentication
+exports.userAuth = (req, res, next) => {
+  // Get token from Authorization header
+  const token = req.header("Authorization")?.split(' ')[1];
+
+  // Check if not token
+  if (!token) {
+    return res.status(401).json({ msg: "No token, authorization denied" });
+  }
+
+  // Verify token
   try {
-    const token = req.header("Authorization").replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Access denied. No token provided." });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded.user; // Assuming the token payload contains the user object
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.user_id);
-    if (!user) return res.status(401).json({ error: "Access denied. Invalid token." });
+    // Check if the user is a regular user
+    if (req.user.role !== "user") {
+      return res.status(403).json({ msg: "Permission denied" });
+    }
 
-    req.user = user;
     next();
-  } catch (error) {
-    console.error("Authentication error:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+  } catch (err) {
+    res.status(401).json({ msg: "Token is not valid" });
   }
 };
 
-// Middleware to authorize admin
-exports.adminAuth = async (req, res, next) => {
-  try {
-    const token = req.header("Authorization").replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Access denied. No token provided." });
+// Middleware to verify vendor authentication
+exports.vendorAuth = (req, res, next) => {
+  // Get token from Authorization header
+  const token = req.header("Authorization")?.split(' ')[1];
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== "admin") return res.status(403).json({ error: "Access denied. Insufficient permissions." });
+  // Check if not token
+  if (!token) {
+    return res.status(401).json({ msg: "No token, authorization denied" });
+  }
+
+  // Verify token
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded.user; // Assuming the token payload contains the user object
+
+    // Check if the user is a vendor
+    if (req.user.role !== "vendor") {
+      return res.status(403).json({ msg: "Permission denied" });
+    }
 
     next();
-  } catch (error) {
-    console.error("Authorization error:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+  } catch (err) {
+    res.status(401).json({ msg: "Token is not valid" });
+  }
+};
+
+// Middleware to verify admin or user authentication
+exports.adminOrUserAuth = (req, res, next) => {
+  // Get token from Authorization header
+  const token = req.header("Authorization")?.split(' ')[1];
+
+  // Check if not token
+  if (!token) {
+    return res.status(401).json({ msg: "No token, authorization denied" });
+  }
+
+  // Verify token
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded.user; // Assuming the token payload contains the user object
+
+    // Check if the user is either admin or user
+    if (req.user.role !== "admin" && req.user.role !== "user") {
+      return res.status(403).json({ msg: "Permission denied" });
+    }
+
+    next();
+  } catch (err) {
+    res.status(401).json({ msg: "Token is not valid" });
+  }
+};
+
+// Middleware to verify admin or vendor authentication
+exports.adminOrVendorAuth = (req, res, next) => {
+  // Get token from Authorization header
+  const token = req.header("Authorization")?.split(' ')[1];
+
+  // Check if not token
+  if (!token) {
+    return res.status(401).json({ msg: "No token, authorization denied" });
+  }
+
+  // Verify token
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded.user; // Assuming the token payload contains the user object
+
+    // Check if the user is either admin or vendor
+    if (req.user.role !== "admin" && req.user.role !== "vendor") {
+      return res.status(403).json({ msg: "Permission denied" });
+    }
+
+    next();
+  } catch (err) {
+    res.status(401).json({ msg: "Token is not valid" });
+  }
+};
+
+// Middleware to verify admin, user or vendor authentication
+exports.adminUserOrVendorAuth = (req, res, next) => {
+  // Get token from Authorization header
+  const token = req.header("Authorization")?.split(' ')[1];
+
+  // Check if not token
+  if (!token) {
+    return res.status(401).json({ msg: "No token, authorization denied" });
+  }
+
+  // Verify token
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded.user; // Assuming the token payload contains the user object
+
+    // Check if the user is either admin, user, or vendor
+    if (req.user.role !== "admin" && req.user.role !== "user" && req.user.role !== "vendor") {
+      return res.status(403).json({ msg: "Permission denied" });
+    }
+
+    next();
+  } catch (err) {
+    res.status(401).json({ msg: "Token is not valid" });
   }
 };

@@ -1,161 +1,221 @@
 const User = require("../models/User");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
-const { validationResult } = require("express-validator");
-require("dotenv").config();
-const { JWT_SECRET } = process.env;
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
-// Controller to get all users (admin only)
+// Function to get all users (admin only)
 exports.getUsers = async (req, res) => {
   try {
-    console.log("user is hitting")
     const users = await User.find();
     res.json(users);
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
   }
 };
 
-// Controller to get a single user profile
+// Function to get the profile of the authenticated user
 exports.getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    const user = await User.findById(req.user.id).select("-password");
     res.json(user);
-  } catch (error) {
-    console.error("Error fetching user:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
   }
 };
 
-// Controller to register a new user
-exports.register = async (req, res) => {
+// Function to register a new user
+exports.registerUser = async (req, res) => {
+  const { name, email, other_email, phone_number, password, user_type, ip_address, firm_name, firm_address, gst_number } = req.body;
+
   try {
-    const { firstName, lastName, email, password, phoneNumber } = req.body;
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ error: "User already exists" });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = new User({
-      firstName,
-      lastName,
-      email,
-      password: hashedPassword,
-      phoneNumber,
-    });
-
-    await newUser.save();
-    res.json({ message: "User registered successfully" });
-  } catch (error) {
-    console.error("Error registering user:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller for user login
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ error: "Invalid email or password" });
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ error: "Invalid email or password" });
-
-    const token = jwt.sign({ user_id: user._id, role: user.role }, JWT_SECRET, { expiresIn: "1h" });
-    res.json({ token });
-  } catch (error) {
-    console.error("Error logging in:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller to edit user profile
-exports.editProfile = async (req, res) => {
-  try {
-    const updates = req.body;
-    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({ message: "Profile updated successfully", user });
-  } catch (error) {
-    console.error("Error updating profile:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller to get children of the user
-exports.getChildren = async (req, res) => {
-  try {
-    // Logic to get children of the user
-    res.json({ message: "Children fetched successfully" });
-  } catch (error) {
-    console.error("Error fetching children:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller for forgot password
-exports.forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ error: "User not found" });
-
-    const token = jwt.sign({ user_id: user._id }, JWT_SECRET, { expiresIn: "1h" });
-    user.resetPasswordToken = token;
-    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
-    await user.save();
-
-    // Send email with the token
-    // await transporter.sendMail({
-    //   to: user.email,
-    //   from: "no-reply@example.com",
-    //   subject: "Password Reset",
-    //   html: `<p>You requested for a password reset</p>
-    //          <p>Click this <a href="http://localhost:3000/reset/${token}">link</a> to reset password</p>`
-    // });
-
-    res.json({ message: "Password reset token sent to email" });
-  } catch (error) {
-    console.error("Error in forgot password:", error);
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-};
-
-// Controller to reset user password
-exports.resetPassword = async (req, res) => {
-  try {
-    const { token } = req.query;
-    const { newPassword, confirmNewPassword } = req.body;
-    if (newPassword !== confirmNewPassword) {
-      return res.status(400).json({ error: "Passwords do not match" });
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ msg: "User already exists" });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.user_id);
-    if (!user || user.resetPasswordExpires < Date.now()) return res.status(400).json({ error: "Password reset token is invalid or has expired" });
+    user = new User({
+      name,
+      email,
+      other_email,
+      phone_number,
+      password,
+      user_type,
+      ip_address,
+      firm_name,
+      firm_address,
+      gst_number,
+      status: "ACTIVE"
+    });
 
-    user.password = await bcrypt.hash(newPassword, 10);
-    user.resetPasswordToken = "";
-    user.resetPasswordExpires = null;
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+
     await user.save();
 
-    res.json({ message: "Password updated successfully" });
-  } catch (error) {
-    console.error("Error resetting password:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+    const payload = {
+      user: {
+        id: user.id
+      }
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: 3600 },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token });
+      }
+    );
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
   }
 };
 
-// Controller to get parents of the user
-exports.getParents = async (req, res) => {
+// Function for user login
+exports.loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
   try {
-    // Logic to get parents of the user
-    res.json({ message: "Parents fetched successfully" });
-  } catch (error) {
-    console.error("Error fetching parents:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+    let user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    const payload = {
+      user: {
+        id: user.id
+      }
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: 3600 },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token });
+      }
+    );
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Function to edit the profile of the authenticated user
+exports.editUserProfile = async (req, res) => {
+  const { name, other_email, phone_number, profile_picture, user_type, firm_name, firm_address, gst_number } = req.body;
+
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { name, other_email, phone_number, profile_picture, user_type, firm_name, firm_address, gst_number },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    res.json(user);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Function to handle forgot password functionality
+exports.forgotPasswordUser = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    let user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ msg: "User not found" });
+    }
+
+    const token = crypto.randomBytes(20).toString('hex');
+
+    user.reset_password_token = token;
+    user.reset_password_expires = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    const mailOptions = {
+      to: user.email,
+      from: process.env.EMAIL_USER,
+      subject: 'Password Reset',
+      text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n` +
+        `Please click on the following link, or paste this into your browser to complete the process:\n\n` +
+        `http://${req.headers.host}/reset/${token}\n\n` +
+        `If you did not request this, please ignore this email and your password will remain unchanged.\n`
+    };
+
+    transporter.sendMail(mailOptions, (err, response) => {
+      if (err) {
+        console.error('There was an error: ', err);
+        return res.status(500).send("Error sending email");
+      }
+      res.status(200).json({ msg: 'Recovery email sent' });
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Function to reset the user's password
+exports.resetPasswordUser = async (req, res) => {
+  const { token, password } = req.body;
+
+  try {
+    const user = await User.findOne({
+      reset_password_token: token,
+      reset_password_expires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ msg: "Password reset token is invalid or has expired" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    user.reset_password_token = "";
+    user.reset_password_expires = null;
+
+    await user.save();
+
+    res.json({ msg: "Password has been reset" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    await user.remove();
+    res.json({ msg: "User removed" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
   }
 };
