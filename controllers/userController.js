@@ -19,6 +19,9 @@ exports.getUsers = async (req, res) => {
 exports.getUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
     res.json(user);
   } catch (err) {
     console.error(err.message);
@@ -28,7 +31,7 @@ exports.getUser = async (req, res) => {
 
 // Function to register a new user
 exports.registerUser = async (req, res) => {
-  const { name, email, other_email, phone_number, password, user_type, ip_address, firm_name, firm_address, gst_number } = req.body;
+  const { name, email, phone_number, password, user_type } = req.body;
 
   try {
     let user = await User.findOne({ email });
@@ -39,15 +42,9 @@ exports.registerUser = async (req, res) => {
     user = new User({
       name,
       email,
-      other_email,
       phone_number,
       password,
-      user_type,
-      ip_address,
-      firm_name,
-      firm_address,
-      gst_number,
-      status: "ACTIVE"
+      user_type
     });
 
     const salt = await bcrypt.genSalt(10);
@@ -57,7 +54,8 @@ exports.registerUser = async (req, res) => {
 
     const payload = {
       user: {
-        id: user.id
+        id: user.id,
+        role: user.user_type
       }
     };
 
@@ -93,7 +91,8 @@ exports.loginUser = async (req, res) => {
 
     const payload = {
       user: {
-        id: user.id
+        id: user.id,
+        role: user.user_type
       }
     };
 
@@ -114,16 +113,36 @@ exports.loginUser = async (req, res) => {
 
 // Function to edit the profile of the authenticated user
 exports.editUserProfile = async (req, res) => {
-  const { name, other_email, phone_number, profile_picture, user_type, firm_name, firm_address, gst_number } = req.body;
+  const { name, phone_number, profile_picture } = req.body;
 
   try {
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { name, other_email, phone_number, profile_picture, user_type, firm_name, firm_address, gst_number },
+      { name, phone_number, profile_picture },
       { new: true, runValidators: true }
     ).select("-password");
 
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
     res.json(user);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Function to delete a user by ID (admin only)
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    await user.remove();
+    res.json({ msg: "User removed" });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
@@ -199,21 +218,6 @@ exports.resetPasswordUser = async (req, res) => {
     await user.save();
 
     res.json({ msg: "Password has been reset" });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server error");
-  }
-};
-
-exports.deleteUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ msg: "User not found" });
-    }
-
-    await user.remove();
-    res.json({ msg: "User removed" });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
